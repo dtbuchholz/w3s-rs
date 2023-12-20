@@ -13,6 +13,7 @@ use std::fs::File;
 use std::io::{self, Write};
 use std::path::Path;
 use std::rc::Rc;
+use std::sync::{Arc, Mutex};
 
 #[derive(Error, Debug)]
 pub enum Error {
@@ -62,7 +63,7 @@ fn gen_single_file_uploader(
     if let Some(custom_block_size) = with_car {
         Box::new(car::Car::new(
             1,
-            Rc::new(vec![dir_item]),
+            Arc::new(Mutex::new(vec![dir_item])),
             None,
             custom_block_size,
             uploader,
@@ -210,7 +211,7 @@ async fn encrypt(
 }
 
 /// Uploads a entire directory recursively with optional encryption and compression
-pub async fn upload_dir(
+/* pub async fn upload_dir(
     dir_path: &str,
     file_filter: Option<fn(name: &str, is_file: bool) -> bool>,
     auth_token: String,
@@ -228,9 +229,9 @@ pub async fn upload_dir(
     );
 
     let (dir_items, count) = DirectoryItem::from_path(dir_path, file_filter)?;
-    let dir_items_rc = Rc::new(dir_items);
+    let dir_items_rc = Arc::new(Mutex::new(dir_items));
 
-    let curr_file_id = Rc::new(RefCell::new(0));
+    let curr_file_id = Arc::new(Mutex::new(0));
 
     let car = car::Car::new(
         count as usize,
@@ -241,24 +242,16 @@ pub async fn upload_dir(
     );
 
     let results = match (with_compression, with_encryption) {
-        (Some(level), Some(password)) => {
-            upload_dir_compress_then_encrypt(curr_file_id, &dir_items_rc, car, level, password)
-                .await?
-        }
-        (Some(level), None) => upload_dir_compress(curr_file_id, &dir_items_rc, car, level).await?,
-        (None, Some(password)) => {
-            upload_dir_encrypt(curr_file_id, &dir_items_rc, car, password).await?
-        }
         _ => {
             let mut dir = dir::Dir::new(curr_file_id, car);
-            dir.walk_write(&dir_items_rc)?;
+            dir.walk_write(dir_items_rc.clone())?;
             dir.next().next().finish_results().await?
         }
     };
 
     Ok(results)
 }
-
+ */
 fn get_file_name(path: &str) -> Option<String> {
     let path = std::path::Path::new(path);
     path.file_name()

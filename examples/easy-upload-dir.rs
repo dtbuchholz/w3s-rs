@@ -1,4 +1,9 @@
-use anyhow::Result;
+#[tokio::main]
+async fn main() {
+    todo!();
+}
+
+/* use anyhow::Result;
 use std::env;
 use std::sync::{Arc, Mutex};
 use w3s::helper;
@@ -13,9 +18,9 @@ async fn main() -> Result<()> {
             "\n\nPlease input [path_to_the_folder] and [web3.storage_auth_token(eyJhbG......MHlq0)]\n\n"
         ),
     }
-}
+} */
 
-async fn upload(path: &String, auth_token: &String) -> Result<()> {
+/* async fn upload(path: &String, auth_token: &String) -> Result<()> {
     let results = helper::upload_dir(
         path,
         None,
@@ -33,3 +38,4 @@ async fn upload(path: &String, auth_token: &String) -> Result<()> {
 
     Ok(())
 }
+ */

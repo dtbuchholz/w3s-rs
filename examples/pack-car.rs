@@ -56,7 +56,7 @@ fn pack(path: &str, name: &str) {
     println!("{}", root);
 
     let car = gen_car(&mut total_blocks, Some(root)).unwrap();
-
+    
     fs::write(name, car).unwrap();
 
     println!("Done");

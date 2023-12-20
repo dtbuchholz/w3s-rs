@@ -3,8 +3,7 @@
 use super::super::iroh_car;
 use super::*;
 use car_util::*;
-use std::cell::RefCell;
-use std::rc::Rc;
+use std::sync::{Arc, Mutex};
 use std::{collections::HashMap, io, mem};
 
 use cid::Cid;
@@ -24,9 +23,9 @@ impl From<Error> for io::Error {
 
 pub struct Car<W: io::Write> {
     files_count: usize,
-    remote_file_id: Rc<RefCell<u64>>,
+    remote_file_id: Arc<Mutex<u64>>,
     id_map: HashMap<u64, Vec<UnixFsStruct>>,
-    dir_items: Rc<Vec<DirectoryItem>>,
+    dir_items: Arc<Mutex<Vec<DirectoryItem>>>,
     buf: Vec<u8>,
     blocks: Vec<(Cid, Vec<u8>)>,
     block_size: usize,
@@ -40,13 +39,13 @@ pub fn single_file_to_directory_item(name: &str, path: Option<&str>) -> Director
 impl<W: io::Write> Car<W> {
     pub fn new(
         files_count: usize,
-        dir_items: Rc<Vec<DirectoryItem>>,
-        remote_file_id: Option<Rc<RefCell<u64>>>,
+        dir_items: Arc<Mutex<Vec<DirectoryItem>>>,
+        remote_file_id: Option<Arc<Mutex<u64>>>,
         custom_block_size: Option<usize>,
         next_writer: W,
     ) -> Car<W> {
         let block_size = custom_block_size.unwrap_or(256 * 1024);
-        let remote_file_id = remote_file_id.unwrap_or_else(|| Rc::new(RefCell::new(0)));
+        let remote_file_id = remote_file_id.unwrap_or_else(|| Arc::new(Mutex::new(0)));
 
         Car {
             files_count,
@@ -75,17 +74,18 @@ impl<W: io::Write> Car<W> {
     }
 
     fn gen_car_from_buf(&mut self, buf: Vec<u8>) -> Result<Option<Vec<u8>>, Error> {
-        let remote_id = *self.remote_file_id.borrow();
+        let remote_id = Arc::clone(&self.remote_file_id);
         let mut blocks = gen_blocks(buf, self.block_size);
 
         self.blocks
             .extend(blocks.iter_mut().map(|x| x.rip_data_with_cid()));
 
         // insert blocks into id_map
-        if let Some(struct_lst) = self.id_map.get_mut(&remote_id) {
+        let lock = remote_id.lock().unwrap();
+        if let Some(struct_lst) = self.id_map.get_mut(&lock) {
             struct_lst.extend(blocks);
         } else {
-            self.id_map.insert(remote_id, blocks);
+            self.id_map.insert(*lock, blocks);
         }
 
         if let Some(split_index) = self.check_self_blocks_overflow_index() {
@@ -147,8 +147,9 @@ impl<W: io::Write> io::Write for Car<W> {
         if self.files_count == self.id_map.len() {
             // collect dir structure recursively to blocks
             let mut blocks = vec![];
-            let root_blocks: Vec<_> = self
-                .dir_items
+            let dir_items = Arc::clone(&self.dir_items);
+            let lock = dir_items.lock().unwrap();
+            let root_blocks: Vec<_> = lock
                 .iter()
                 .map(|item| item.to_unixfs_struct(&self.id_map, &mut blocks))
                 .collect();

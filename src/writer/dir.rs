@@ -1,19 +1,18 @@
 //! Handles recursive walks in a directory and writes file bytes to the next writer
-//! 
+//!
 use super::*;
 use car_util::DirectoryItem;
-use std::cell::RefCell;
 use std::fs::File;
 use std::io;
-use std::rc::Rc;
+use std::sync::{Arc, Mutex};
 
 pub struct Dir<W: io::Write> {
-    curr_file_id: Rc<RefCell<u64>>,
+    curr_file_id: Arc<Mutex<u64>>,
     next_writer: W,
 }
 
 impl<W: io::Write> Dir<W> {
-    pub fn new(curr_file_id: Rc<RefCell<u64>>, next_writer: W) -> Self {
+    pub fn new(curr_file_id: Arc<Mutex<u64>>, next_writer: W) -> Self {
         Dir {
             curr_file_id,
             next_writer,
@@ -24,7 +23,8 @@ impl<W: io::Write> Dir<W> {
         for item in dir_items {
             match item {
                 DirectoryItem::File(_, path, id) => {
-                    *self.curr_file_id.borrow_mut() = *id;
+                    let mut file_id = self.curr_file_id.lock().unwrap();
+                    *file_id = *id;
                     let mut file = File::open(path)?;
                     io::copy(&mut file, &mut self.next_writer)?;
                     self.next_writer.flush()?;
