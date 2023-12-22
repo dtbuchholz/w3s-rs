@@ -3,16 +3,12 @@
 use cid::Cid;
 use thiserror::Error;
 
-use crate::writer::car_util::DirectoryItem;
-
 use super::gateway::*;
 use super::writer::*;
-use std::cell::RefCell;
 use std::fs;
 use std::fs::File;
 use std::io::{self, Write};
 use std::path::Path;
-use std::rc::Rc;
 use std::sync::{Arc, Mutex};
 
 #[derive(Error, Debug)]
@@ -40,6 +36,7 @@ pub enum Error {
 }
 
 fn gen_single_file_uploader(
+    host: String,
     auth_token: impl AsRef<str>,
     name: impl AsRef<str>,
     max_upload_concurrent: usize,
@@ -47,6 +44,7 @@ fn gen_single_file_uploader(
     with_car: Option<Option<usize>>,
 ) -> Box<dyn ChainWrite<uploader::Uploader>> {
     let uploader = uploader::Uploader::new(
+        host,
         auth_token.as_ref().to_owned(),
         name.as_ref().to_owned(),
         if with_car.is_some() {
@@ -87,16 +85,6 @@ async fn upload_dir_compress_then_encrypt(
     let result = dir.next().next().next().finish_results().await?;
     Ok(result)
 }
-#[cfg(not(all(feature = "zstd", feature = "encryption")))]
-async fn upload_dir_compress_then_encrypt(
-    _: Rc<RefCell<u64>>,
-    _: &[DirectoryItem],
-    _: car::Car<uploader::Uploader>,
-    _: Option<i32>,
-    _: Vec<u8>,
-) -> Result<Vec<Cid>, Error> {
-    Err(Error::FeatureNoCipherAndZstd)
-}
 
 #[cfg(all(feature = "zstd", feature = "encryption"))]
 async fn compress_then_encrypt(
@@ -135,15 +123,6 @@ async fn upload_dir_compress(
     let result = dir.next().next().finish_results().await?;
     Ok(result)
 }
-#[cfg(not(feature = "zstd"))]
-async fn upload_dir_compress(
-    _: Rc<RefCell<u64>>,
-    _: &[DirectoryItem],
-    _: car::Car<uploader::Uploader>,
-    _: Option<i32>,
-) -> Result<Vec<Cid>, Error> {
-    Err(Error::FeatureNoZstd)
-}
 
 #[cfg(feature = "zstd")]
 async fn compress(
@@ -178,15 +157,6 @@ async fn upload_dir_encrypt(
     dir.walk_write(dir_items)?;
     let result = dir.next().next().next().finish_results().await?;
     Ok(result)
-}
-#[cfg(not(feature = "encryption"))]
-async fn upload_dir_encrypt(
-    _: Rc<RefCell<u64>>,
-    _: &[DirectoryItem],
-    _: car::Car<uploader::Uploader>,
-    _: Vec<u8>,
-) -> Result<Vec<Cid>, Error> {
-    Err(Error::FeatureNoCipher)
 }
 
 #[cfg(feature = "encryption")]
@@ -262,6 +232,7 @@ fn get_file_name(path: &str) -> Option<String> {
 /// Uploads a single file with optional encryption and compression
 pub async fn upload(
     path: &str,
+    host: &str,
     auth_token: impl AsRef<str>,
     max_upload_concurrent: usize,
     progress_listener: Option<uploader::ProgressListener>,
@@ -273,6 +244,7 @@ pub async fn upload(
     let name = get_file_name(path).unwrap_or_default();
 
     let mut writer = gen_single_file_uploader(
+        host.to_string(),
         auth_token,
         name,
         max_upload_concurrent,

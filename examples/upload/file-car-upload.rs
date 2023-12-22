@@ -15,21 +15,22 @@ fn get_file_name(path: &String) -> Option<String> {
 #[tokio::main]
 async fn main() -> Result<()> {
     let args = env::args().collect::<Vec<_>>();
-
+    let host = "https://api.web3.storage".to_string();
     match args.as_slice() {
-        [_, path, auth_token] => upload(path, auth_token).await,
+        [_, path, auth_token] => upload(path, &host, auth_token).await,
         _ => panic!(
             "\n\nPlease input [the_path_to_the_file] and [web3.storage_auth_token(eyJhbG......MHlq0)]\n\n"
         ),
     }
 }
 
-async fn upload(path: &String, auth_token: &String) -> Result<()> {
+async fn upload(path: &String, host: &String, auth_token: &String) -> Result<()> {
     let mut file = File::open(path)?;
     let filename = get_file_name(path).unwrap();
 
     let uploader = uploader::Uploader::new(
         auth_token.clone(),
+        host.clone(),
         filename.clone(),
         uploader::UploadType::Car,
         2,

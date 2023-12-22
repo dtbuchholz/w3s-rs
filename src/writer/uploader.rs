@@ -5,8 +5,7 @@ use futures::TryFutureExt;
 use reqwest::{Body, Client};
 use serde::Deserialize;
 use std::{
-    cmp, fmt,
-    io, mem,
+    cmp, fmt, io, mem,
     str::FromStr,
     sync::{Arc, Mutex},
 };
@@ -47,6 +46,7 @@ pub type ProgressListener =
     Arc<Mutex<dyn FnMut(Arc<String>, usize, usize, usize) + Send + Sync + 'static>>;
 pub struct Uploader {
     upload_type: UploadType,
+    host: String,
     auth_token: Arc<String>,
     w3s_name: Arc<String>,
     max_concurrent: usize,
@@ -58,6 +58,7 @@ pub struct Uploader {
 impl Uploader {
     pub fn new(
         auth_token: String,
+        host: String,
         w3s_name: String,
         upload_type: UploadType,
         max_concurrent: usize,
@@ -65,6 +66,7 @@ impl Uploader {
     ) -> Self {
         Uploader {
             upload_type,
+            host,
             auth_token: Arc::new(auth_token),
             w3s_name: Arc::new(w3s_name),
             max_concurrent,
@@ -112,11 +114,12 @@ impl Uploader {
         upload_type: UploadType,
         w3s_name: Arc<String>,
         part: usize,
+        host: String,
         auth_token: Arc<String>,
         data: Arc<Vec<u8>>,
         progress_listener: Option<ProgressListener>,
     ) -> Result<Cid, Error> {
-        let api = Arc::new(format!("https://api.web3.storage/{}", upload_type));
+        let api = Arc::new(format!("{}/{}", host, upload_type));
 
         let upload_fn = || {
             let body = Body::wrap_stream(ProgressStream {
@@ -155,6 +158,7 @@ impl io::Write for Uploader {
             self.upload_type,
             self.w3s_name.clone(),
             self.tasks.len() + self.results.len(),
+            self.host.clone(),
             self.auth_token.clone(),
             Arc::new(buf.to_vec()),
             self.progress_listener.clone(),
