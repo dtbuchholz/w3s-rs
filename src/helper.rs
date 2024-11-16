@@ -362,7 +362,7 @@ async fn rec_download(
 pub async fn download_dir(
     url: &str,
     save_to_folder: &str,
-    check_progress_listener: Option<fn(&str, u16)>,
+    check_progress_listener: Option<fn(String, u16)>,
     progress_listener: Option<uploader::ProgressListener>,
     with_decryption: Option<Vec<u8>>,
     with_decompression: bool,
